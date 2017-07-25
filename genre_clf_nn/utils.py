@@ -77,6 +77,10 @@ class NameItSomethingGood(object):
 
 
 def load(filepath):
+    '''
+        This function is an exact copy of the load function found in the
+        utils.py script from the FMA Dataset repository.
+    '''
 
     filename = os.path.basename(filepath)
 
