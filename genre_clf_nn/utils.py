@@ -9,7 +9,7 @@
 '''
 
 import os
-import utils
+import pandas as pd
 import random
 
 
@@ -76,11 +76,47 @@ class NameItSomethingGood(object):
         return train_files, valid_files, test_files
 
 
-# Get metadata from fma_metadata
-tracks = utils.load(META_DIR + 'tracks.csv')
-genres = utils.load(META_DIR + 'genres.csv')
-features = utils.load(META_DIR + 'features.csv')
-echonest = utils.load(META_DIR + 'echonest.csv').echonest # .echonest remove useless top-most column
+def load(filepath):
 
+    filename = os.path.basename(filepath)
+
+    if filename.endswith('features.csv'):
+        return pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
+
+    elif filename.endswith('echonest.csv'):
+        return pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
+
+    elif filename.endswith('genres.csv'):
+        return pd.read_csv(filepath, index_col = 0)
+
+    elif filename.endswith('tracks.csv'):
+        tracks = pd.read_csv(filepath, index_col = 0, header=[0, 1])
+
+        COLUMNS = [('track', 'tags'), ('album', 'tags'), ('artist', 'tags'),
+                   ('track', 'genres'), ('track', 'genres_all')]
+        for column in COLUMNS:
+            tracks[column] = tracks[column].map(ast.literal_eval)
+
+        COLUMNS = [('track', 'date_created'), ('track', 'date_recorded'),
+                   ('album', 'date_created'), ('album', 'date_released'),
+                   ('artist', 'date_created'), ('artist', 'active_year_begin'),
+                   ('artist', 'active_year_end')]
+        for column in COLUMNS:
+            tracks[column] = pd.to_datetime(tracks[column])
+
+        SUBSETS = ('small', 'medium', 'large')
+        tracks['set', 'subset'] = tracks['set', 'subset'].astype(
+                'category', categories=SUBSETS, ordered=True)
+
+        COLUMNS = [('track', 'genre_top'), ('track', 'license'),
+                   ('album', 'type'), ('album', 'information'),
+                   ('artist', 'bio')]
+        for column in COLUMNS:
+            tracks[column] = tracks[column].astype('category')
+
+        return tracks
+
+    else:
+        raise ValueError('Unrecognized file name passed')
 
 # Get audio data from fma_large
