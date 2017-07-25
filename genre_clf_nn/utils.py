@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 '''
     Branden Carrier
     07/25/2017
@@ -8,6 +6,7 @@
     song's genre based on its audio.
 '''
 
+import ast
 import os
 import pandas as pd
 import random
@@ -16,8 +15,8 @@ import random
 class NameItSomethingGood(object):
 
     def __init__(self,
-                 audio_dir = 'data/fma_large/',
-                 meta_dir = 'data/fma_metadata/',
+                 audio_dir,
+                 meta_dir,
                  train_percent = 0.8,
                  valid_percent = 0.1):
 
@@ -76,51 +75,78 @@ class NameItSomethingGood(object):
         return train_files, valid_files, test_files
 
 
-def load(filepath):
-    '''
-        This function is an exact copy of the load function found in the
-        utils.py script from the FMA Dataset repository.
-    '''
+    def _load_meta_csvs(self):
+        '''
+            The main contents of this function are a copy of the load function
+            found in utils.py from the FMA Dataset repository
+        '''
 
-    filename = os.path.basename(filepath)
+        features, echonest, genres, tracks =  None, None, None, None
 
-    if filename.endswith('features.csv'):
-        return pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
+        for root, _, files in os.walk(self.meta_dir):
+            for filename in files:
 
-    elif filename.endswith('echonest.csv'):
-        return pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
+                filepath = os.path.join(root, filename)
 
-    elif filename.endswith('genres.csv'):
-        return pd.read_csv(filepath, index_col = 0)
+                if filename.endswith('features.csv'):
+                    features = pd.read_csv(filepath,
+                                           index_col = 0,
+                                           header = [0, 1, 2])
 
-    elif filename.endswith('tracks.csv'):
-        tracks = pd.read_csv(filepath, index_col = 0, header=[0, 1])
+                elif filename.endswith('echonest.csv'):
+                    echonest = pd.read_csv(filepath,
+                                           index_col = 0,
+                                           header = [0, 1, 2])
 
-        COLUMNS = [('track', 'tags'), ('album', 'tags'), ('artist', 'tags'),
-                   ('track', 'genres'), ('track', 'genres_all')]
-        for column in COLUMNS:
-            tracks[column] = tracks[column].map(ast.literal_eval)
+                elif filename.endswith('genres.csv'):
+                    genres = pd.read_csv(filepath,
+                                         index_col = 0)
 
-        COLUMNS = [('track', 'date_created'), ('track', 'date_recorded'),
-                   ('album', 'date_created'), ('album', 'date_released'),
-                   ('artist', 'date_created'), ('artist', 'active_year_begin'),
-                   ('artist', 'active_year_end')]
-        for column in COLUMNS:
-            tracks[column] = pd.to_datetime(tracks[column])
+                elif filename.endswith('tracks.csv'):
+                    tracks = pd.read_csv(filepath,
+                                         index_col = 0,
+                                         header = [0, 1])
 
-        SUBSETS = ('small', 'medium', 'large')
-        tracks['set', 'subset'] = tracks['set', 'subset'].astype(
-                'category', categories=SUBSETS, ordered=True)
+                    # Safely evaluating strings containing Python values from
+                    # untrusted sources
+                    for item in [('track', 'tags'),
+                                 ('album', 'tags'),
+                                 ('artist', 'tags'),
+                                 ('track', 'genres'),
+                                 ('track', 'genres_all')]:
+                        tracks[item] = tracks[item].map(ast.literal_eval)
 
-        COLUMNS = [('track', 'genre_top'), ('track', 'license'),
-                   ('album', 'type'), ('album', 'information'),
-                   ('artist', 'bio')]
-        for column in COLUMNS:
-            tracks[column] = tracks[column].astype('category')
+                    # Convert to datetime
+                    for item in [('track', 'date_created'),
+                                 ('track', 'date_recorded'),
+                                 ('album', 'date_created'),
+                                 ('album', 'date_released'),
+                                 ('artist', 'date_created'),
+                                 ('artist', 'active_year_begin'),
+                                 ('artist', 'active_year_end')]:
+                        tracks[item] = pd.to_datetime(tracks[item])
 
-        return tracks
+                    # Convert to ordered category
+                    tracks['set', 'subset'] = tracks['set', 'subset'].astype(
+                        dtype = 'category',
+                        categories = ('small', 'medium', 'large'),
+                        ordered = True
+                    )
 
-    else:
-        raise ValueError('Unrecognized file name passed')
+                    # Convert to unordered category
+                    for item in [('track', 'genre_top'),
+                                 ('track', 'license'),
+                                 ('album', 'type'),
+                                 ('album', 'information'),
+                                 ('artist', 'bio')]:
+                        tracks[item] = tracks[item].astype('category')
 
-# Get audio data from fma_large
+        # Alert the user if any one of the DataFrames to be returned was
+        # not made
+        if None in [features, echonest, genres, tracks]:
+            csv_names = ['features', 'echonest', 'genres', 'tracks']
+            is_none = [name for name in csv_names if eval(name) is None]
+            print('Warning - A DataFrame was not made for' + \
+                  'the following csvs: ' + ', '.join(is_none))
+
+        return features, echonest, genres, tracks
