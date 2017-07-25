@@ -1,9 +1,6 @@
 '''
     Branden Carrier
     07/25/2017
-
-    This purpose of this script is to build a neural network that classifies a
-    song's genre based on its audio.
 '''
 
 import ast
@@ -32,8 +29,8 @@ class NameItSomethingGood(object):
     def _get_split(self):
         '''
             Purpose -
-                This function assigns a set of audio files to a training,
-                validation and testing set
+                This function assigns a set of audio files to training,
+                validation and testing sets
 
             Input -
                 self.audio_dir: The directory containing the set of directories
