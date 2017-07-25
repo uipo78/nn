@@ -26,6 +26,7 @@ class NameItSomethingGood(object):
         self.valid_percent = valid_percent
         self.test_percent = 1 - train_percent - valid_percent
         self._train_files, self._valid_files, self._test_files = _get_split()
+        self.features, self.echonest, self.genres, self.tracks = _load_meta_csvs()
 
 
     def _get_split(self):
