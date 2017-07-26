@@ -19,17 +19,22 @@ from keras import (
 )
 
 
-BATCH_SIZE = 128
-FFT_WINDOW_LEN = 2048
+# Global constants
+AUDIO_DIR = '../data/fma_large/'
+META_DIR = '../data/fma_metadata/'
+
 SAMPLING_RATE = 44100
+FFT_WINDOW_LEN = 2048
 HOP_LENGTH = 512
+
+BATCH_SIZE = 128
 
 
 def format_audio(img_path,
                  sr = SAMPLING_RATE,
                  n_fft = FFT_WINDOW_LEN,
                  hop_length = HOP_LENGTH):
-                 
+
     audio_time_series, _ = librosa.load(img_path,
                                         sr = sr)
     S = librosa.feature.melspectrogram(y = audio_time_series,
