@@ -10,7 +10,8 @@
 
 import keras
 import librosa
-import utils
+
+from utils import NameItSomethingGood
 
 from keras import (
     Dense,
@@ -56,6 +57,9 @@ def make_model_input_generator(files, batch_size = BATCH_SIZE):
 
 
 def main():
+
+    # Instantiate data class
+    data = NameItSomethingGood(audio_dir = AUDIO_DIR, meta_dir = META_DIR)
 
     # Instantiate model
     model = Sequential()
