@@ -9,24 +9,17 @@ import pandas as pd
 import random
 
 
-class NameItSomethingGood(object):
+class AudioData(object):
 
-    def __init__(self,
-                 audio_dir,
-                 meta_dir,
-                 train_percent = 0.8,
-                 valid_percent = 0.1):
-
+    def __init__(self, audio_dir, train_percent = 0.8, valid_percent = 0.1):
         self.audio_dir = audio_dir
-        self.meta_dir = meta_dir
         self.train_percent = train_percent
         self.valid_percent = valid_percent
         self.test_percent = 1 - train_percent - valid_percent
-        self.train_files, self.valid_files, self.test_files = _get_splits()
-        self.features, self.echonest, self.genres, self.tracks = _load_meta_csvs()
+        self.train_files, self.valid_files, self.test_files = None, None, None
 
 
-    def _get_splits(self):
+    def get_splits(self):
         '''
             Purpose -
                 This function assigns a set of audio files to training,
@@ -63,17 +56,24 @@ class NameItSomethingGood(object):
         # set; the following block (which makes up _VALID_PERCENT of mp3s)
         # is assigned to the validation set; what remains (which makes up
         # _TEST_PERCENT of mp3s) is assigned to the testing set.
-        end_train_idx = round(self.train_percent * len(mp3s))
-        end_valid_idx = end_train_idx + round((self.valid_percent * len(mp3s)))
+        end_train_idx = int(self.train_percent * len(mp3s))
+        end_valid_idx = end_train_idx + int((self.valid_percent * len(mp3s)))
 
-        train_files = mp3s[:end_train_idx]
-        valid_files = mp3s[end_train_idx:end_valid_idx]
-        test_files = mp3s[end_valid_idx:]
+        self.train_files = mp3s[:end_train_idx]
+        self.valid_files = mp3s[end_train_idx:end_valid_idx]
+        self.test_files = mp3s[end_valid_idx:]
 
-        return train_files, valid_files, test_files
+        return None
 
 
-    def _load_meta_csvs(self):
+class MetaData():
+
+    def __init__(self):
+        pass
+
+
+    @staticmethod
+    def load(meta_dir):
         '''
             The main contents of this function are a copy of the load function
             found in utils.py from the FMA Dataset repository
@@ -81,7 +81,7 @@ class NameItSomethingGood(object):
 
         features, echonest, genres, tracks =  None, None, None, None
 
-        for root, _, files in os.walk(self.meta_dir):
+        for root, _, files in os.walk(meta_dir):
             for filename in files:
 
                 filepath = os.path.join(root, filename)
