@@ -22,7 +22,6 @@ from keras import (
 
 # Global constants
 AUDIO_DIR = '../data/fma_large/'
-META_DIR = '../data/fma_metadata/'
 
 SAMPLING_RATE = 44100
 FFT_WINDOW_LEN = 2048
@@ -59,7 +58,7 @@ def make_model_input_generator(files, batch_size = BATCH_SIZE):
 def main():
 
     # Instantiate data class
-    data = NameItSomethingGood(audio_dir = AUDIO_DIR, meta_dir = META_DIR)
+    audio_data = AudioData(audio_dir = AUDIO_DIR).get_splits()
 
     # Instantiate model
     model = Sequential()
@@ -84,8 +83,8 @@ def main():
         metrics = ['accuracy']
     )
 
-    train_gen = make_model_input_generator(data.train_files)
-    valid_gen = make_model_input_generator(data.valid_files)
+    train_gen = make_model_input_generator(audio_data.train_files)
+    valid_gen = make_model_input_generator(audio_data.valid_files)
 
     model.fit_generator(train_gen)
 
