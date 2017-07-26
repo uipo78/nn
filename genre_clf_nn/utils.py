@@ -22,11 +22,11 @@ class NameItSomethingGood(object):
         self.train_percent = train_percent
         self.valid_percent = valid_percent
         self.test_percent = 1 - train_percent - valid_percent
-        self._train_files, self._valid_files, self._test_files = _get_split()
+        self.train_files, self.valid_files, self.test_files = _get_splits()
         self.features, self.echonest, self.genres, self.tracks = _load_meta_csvs()
 
 
-    def _get_split(self):
+    def _get_splits(self):
         '''
             Purpose -
                 This function assigns a set of audio files to training,
