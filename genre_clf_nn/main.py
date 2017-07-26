@@ -11,6 +11,11 @@
 import keras
 import utils
 
+from keras import (
+    Dense,
+    GRU,
+    Sequential
+)
 
 def main():
 
