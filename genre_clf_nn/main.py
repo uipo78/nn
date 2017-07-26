@@ -19,7 +19,17 @@ from keras import (
 )
 
 
-def format_audio(img_path, sr = 44100, n_fft = 2048, hop_length = 512):
+BATCH_SIZE = 128
+FFT_WINDOW_LEN = 2048
+SAMPLING_RATE = 44100
+HOP_LENGTH = 512
+
+
+def format_audio(img_path,
+                 sr = SAMPLING_RATE,
+                 n_fft = FFT_WINDOW_LEN,
+                 hop_length = HOP_LENGTH):
+                 
     audio_time_series, _ = librosa.load(img_path,
                                         sr = sr)
     S = librosa.feature.melspectrogram(y = audio_time_series,
@@ -30,7 +40,7 @@ def format_audio(img_path, sr = 44100, n_fft = 2048, hop_length = 512):
     return S.T
 
 
-def make_model_input_generator(files, batch_size = 128):
+def make_model_input_generator(files, batch_size = BATCH_SIZE):
     to_stack = []
     for filepath in files:
         formatted_audio = format_audio(filepath)
