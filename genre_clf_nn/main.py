@@ -84,7 +84,10 @@ def main():
         metrics = ['accuracy']
     )
 
-    model.fit_generator()
+    train_gen = make_model_input_generator(data.train_files)
+    valid_gen = make_model_input_generator(data.valid_files)
+
+    model.fit_generator(train_gen)
 
 if __name__ == '__main__':
     main()
