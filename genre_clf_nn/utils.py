@@ -49,9 +49,9 @@ class NameItSomethingGood(object):
         # files
         mp3s = []
         for root, _, files in os.walk(self.audio_dir):
-            for names in files:
-                if name.endswith('.mp3'):
-                    filepath = os.path.join(root, name)
+            for filename in files:
+                if filename.endswith('.mp3'):
+                    filepath = os.path.join(root, filename)
                     mp3s.append(filepath)
 
         # Shuffle the order of the files in mp3s so that the following
