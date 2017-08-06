@@ -10,7 +10,7 @@
 import tensorflow as tf
 import time
 
-from models import Model
+from models import TensorflowModel
 from utils import DataProcessor
 
 from sklearn.preprocessing import LabelEncoder
@@ -25,7 +25,7 @@ class Config(object):
     learning_rate = 1e-4
 
 
-class GenresClassifier(Model):
+class TensorGenresClassifier(TensorflowModel):
 
     @staticmethod
     def make_convo_relu_pool_layer():
@@ -117,20 +117,8 @@ class GenresClassifier(Model):
         self.build()
 
 
+class KerasGenresClassifier(object):
+
+
 if __name__ == '__main__':
     config = Config()
-
-    with tf.Graph().as_default():
-
-        # Build the model and add the variable initializer Op
-        model = GenresClassifier(config)
-
-        init = tf.global_variables_initializer()
-
-        with tf.Session() as sess:
-
-            # Run the Op to initialize the variables.
-            sess.run(init)
-
-            # Fit the model
-            losses = model.fit(sess, inputs, labels)

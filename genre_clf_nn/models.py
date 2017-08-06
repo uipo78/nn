@@ -1,4 +1,4 @@
-class Model(object):
+class TensorflowModel(object):
 
     def add_placeholders(self):
         raise NotImplementedError("Each Model must re-implement this method.")
