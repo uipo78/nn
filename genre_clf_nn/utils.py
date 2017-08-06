@@ -275,7 +275,7 @@ class Visualizer(object):
                             if key in cls._FIGURE_KWARGS_KEYS})
         data = cls._get_gram_plot_data(audio_ts, spec_type, **kwargs)
         librosa.display.specshow(data=data,
-                                 cmap=('gray_r' if grayscale else 'magma'),
+                                 cmap=('gray_r' if grayscale else 'inferno'),
                                  x_axis='time',
                                  y_axis=spec_type)
         if spec_type in ['chroma', 'tempo']:
@@ -296,7 +296,7 @@ class Visualizer(object):
             data = cls._get_gram_plot_data(audio_ts, spec_type=spec_type,
                                            **kwargs)
             librosa.display.specshow(data=data,
-                                     cmap=('gray_r' if grayscale else 'magma'),
+                                     cmap=('gray_r' if grayscale else 'inferno'),
                                      x_axis='time',
                                      y_axis=spec_type)
             plt.title(name.title())
