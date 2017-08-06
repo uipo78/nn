@@ -4,147 +4,333 @@
 '''
 
 import ast
+import itertools
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pandas as pd
 import random
 
-
-class AudioData(object):
-
-    def __init__(self, audio_dir, train_percent = 0.8, valid_percent = 0.1):
-        self.audio_dir = audio_dir
-        self.train_percent = train_percent
-        self.valid_percent = valid_percent
-        self.test_percent = 1 - train_percent - valid_percent
-        self.train_files, self.valid_files, self.test_files = None, None, None
+from sklearn.preprocessing import LabelEncoder
 
 
-    def get_splits(self):
+class DataProcessor(object):
+
+    AUDIO_FILE_EXT = '.mp3'
+    FEATURE_EXTR_PARAMS = {
+        'sr': 22050,
+        'hop_length': 512,
+        'n_fft': 2048
+    }
+    TRAIN_PERCENT = 0.8
+    VALID_PERCENT = 0.1
+    TEST_PERCENT = 1 - TRAIN_PERCENT - VALID_PERCENT
+
+    def _get_splits(self):
         '''
-            Purpose -
-                This function assigns a set of audio files to training,
-                validation and testing sets
+            This function assigns a list of files to training, validation, and
+            testing sets.
 
-            Input -
-                self.audio_dir: The directory containing the set of directories
-                                holding the mp3 files.
-            Output:
-                train_files: List of relative paths of the files assigned to the
-                             training set.
-                valid_files: List of relative paths of the files assigned to the
-                             validation set.
-                test_files: List of relative paths of the files assigned to the
-                            testing set.
+            Args
+                dir_: The directory in which all files to be assigned to subsets
+                      are located.
+                file_ext: The file extension of to-be-assigned files.
+                train_percent: The percentage of files to be assigned to the
+                               training set.
+                valid_percent: The percentage of files to be assigned to the
+                               validation set.
+
+            Returns
+                train_files: A list of paths (relative to the project root) of
+                             the files assigned to the training set.
+                valid_files: A list of paths (relative to the project root)
+                             of the files assigned to the validation set.
+                test_files: A list of paths (relative to the project root)
+                            of the files assigned to the testing set.
         '''
 
-        # Build the list mp3s by walking through each subdirectory of
-        # self.audio_dir and appending to mp3s the relative path of all mp3
-        # files
-        mp3s = []
-        for root, _, files in os.walk(self.audio_dir):
-            for filename in files:
-                if filename.endswith('.mp3'):
+        # Build files by walking through each subdirectory of self._audio_dir
+        # and appending to files the relative path of all files in
+        # self._audio_dir
+        files = []
+        for root, _, dir_files in os.walk(self._audio_dir):
+            for filename in dir_files:
+                if filename.endswith(self._audio_file_ext):
                     filepath = os.path.join(root, filename)
-                    mp3s.append(filepath)
+                    files.append(filepath)
 
-        # Shuffle the order of the files in mp3s so that the following
+        # Shuffle the order of the files so that the following
         # training-validation-testing assignment is random.
-        random.shuffle(mp3s)
+        random.shuffle(files)
 
         # Build the trainining, validation, and testing sets as follows:
-        # the first _TRAIN_PERCENT of mp3s is assignedd to the training
-        # set; the following block (which makes up _VALID_PERCENT of mp3s)
+        # the first self._train_percent of files is assigned to the training
+        # set; the following block (which makes up self._valid_percent of files)
         # is assigned to the validation set; what remains (which makes up
-        # _TEST_PERCENT of mp3s) is assigned to the testing set.
-        end_train_idx = int(self.train_percent * len(mp3s))
-        end_valid_idx = end_train_idx + int((self.valid_percent * len(mp3s)))
+        # 1 - (self._train_percent + self._valid_percent) of files) is assigned
+        # to the testing set.
+        end_train_idx = int(self._train_percent * len(files))
+        end_valid_idx = end_train_idx + int((self._valid_percent * len(files)))
 
-        self.train_files = mp3s[:end_train_idx]
-        self.valid_files = mp3s[end_train_idx:end_valid_idx]
-        self.test_files = mp3s[end_valid_idx:]
+        self._train_files = files[:end_train_idx]
+        self._valid_files = files[end_train_idx:end_valid_idx]
+        self._test_files = files[end_valid_idx:]
 
-        return None
+    def __init__(self,
+                 audio_dir,
+                 meta_dir=None,
+                 audio_file_ext=AUDIO_FILE_EXT,
+                 train_percent=TRAIN_PERCENT,
+                 valid_percent=VALID_PERCENT):
+        self._audio_dir = audio_dir
+        self._meta_dir = meta_dir
+        self._audio_file_ext = audio_file_ext
+        self._train_percent = train_percent
+        self._valid_percent = valid_percent
+        self._get_splits()
+
+    def print_audio_dir(self):
+        print(self._audio_dir)
+
+    def print_meta_dir(self):
+        print(self._meta_dir)
+
+    def print_audio_file_ext(self):
+        print(self._audio_file_ext)
+
+    def print_split_percents(self):
+        t, v = self._train_percent, self._valid_percent
+        print(t, v, 1 - t - v)
+
+    def load_features(self):
+        assert self._meta_dir is not None
+
+        filepath = self._meta_dir + 'features.csv'
+        features = pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
+
+        return features
+
+    def load_echonest(self):
+        assert self._meta_dir is not None
+
+        filepath = self._meta_dir + 'echonest.csv'
+        echonest = pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
+
+        return echonest
+
+    def load_genres(self):
+        assert self._meta_dir is not None
+
+        filepath = self._meta_dir + 'genres.csv'
+        genres = pd.read_csv(filepath, index_col = 0)
+
+        return genres
+
+    def load_tracks(self):
+        assert self._meta_dir is not None
+
+        filepath = self._meta_dir + 'tracks.csv'
+        tracks = pd.read_csv(filepath, index_col = 0, header = [0, 1])
+
+        # Safely evaluating strings containing Python values from
+        # untrusted sources
+        for item in [('track', 'tags'),
+                     ('album', 'tags'),
+                     ('artist', 'tags'),
+                     ('track', 'genres'),
+                     ('track', 'genres_all')]:
+            tracks[item] = tracks[item].map(ast.literal_eval)
+
+        # Convert to datetime
+        for item in [('track', 'date_created'),
+                     ('track', 'date_recorded'),
+                     ('album', 'date_created'),
+                     ('album', 'date_released'),
+                     ('artist', 'date_created'),
+                     ('artist', 'active_year_begin'),
+                     ('artist', 'active_year_end')]:
+            tracks[item] = pd.to_datetime(tracks[item])
+
+        # Convert to ordered category
+        tracks['set', 'subset'] = tracks['set', 'subset'].astype(
+            dtype = 'category',
+            categories = ('small', 'medium', 'large'),
+            ordered = True
+        )
+
+        # Convert to unordered category
+        for item in [('track', 'genre_top'),
+                     ('track', 'license'),
+                     ('album', 'type'),
+                     ('album', 'information'),
+                     ('artist', 'bio')]:
+            tracks[item] = tracks[item].astype('category')
+
+        return tracks
+
+    @staticmethod
+    def _get_audio_ts(filepaths, sr):
+        audio_ts_list = []
+        for filepath in filepaths:
+            X, sr = librosa.load(filepath, sr)
+            audio_ts_list.append(X)
+
+        return audio_ts_list
+
+    @staticmethod
+    def _extract_features(audio_ts, **kwargs):
+        stft = np.abs(
+            librosa.stft(audio_ts)
+        )
+        mfccs = np.mean(
+            librosa.feature.mfcc(y=audio_ts, sr=kwargs['sr']).T,
+            axis=0
+        )
+        chroma = np.mean(
+            librosa.feature.chroma_stft(S=stft, sr=kwargs['sr']).T,
+            axis=0
+        )
+        mel = np.mean(
+            librosa.feature.melspectrogram(audio_ts, sr=kwargs['sr']).T,
+            axis=0
+        )
+        contrast = np.mean(
+            librosa.feature.spectral_contrast(S=stft, sr=kwargs['sr']).T,
+            axis=0
+        )
+        tonnetz = np.mean(
+            librosa.feature.tonnetz(y=librosa.effects.harmonic(audio_ts),
+                                    sr=kwargs['sr']).T,
+            axis=0
+        )
+
+        return mfccs, chroma, mel, contrast, tonnetz
+
+    @classmethod
+    def batch_generator(cls, filepaths, get_label_function, batch_size):
+        filepath_batches = [iter(filepaths)] * batch_size
+        for filepath_batch in itertools.zip_longest(*filepath_batches):
+
+            audio_ts_batch = cls._get_audio_ts(filepath_batch,
+                                               sr=cls.FEAT_EXTR_PARAMS['sr'])
+
+            # 173 is the the number of columns to which the concatentation of
+            # features expands
+            features_mat, labels_vec = np.empty((batch_size, 173)), np.empty(0)
+
+            for filepath, audio_ts in zip(filepath_batch, audio_ts_batch):
+                ith_features = np.concatenate([
+                    cls._extract_features(audio_ts=audio_ts,
+                                          **cls.FEATURE_EXTR_PARAMS)
+                ])
+                features_mat = np.stack([features_mat, ith_features])
+                filename = filepath.split('/')[-1].replace(cls.AUDIO_FILE_EXT, '')
+                labels_vec = np.append(labels_vec, get_label_function(filename))
+
+            yield features_mat, labels_vec
 
 
-class MetaData():
+class Visualizer(object):
+
+    PLOT_NAMES = {
+        'linear': 'Linear-frequency power spectrogram',
+        'log': 'Log-frequency power spectrogram',
+        'cqt_note': 'Constant-Q power spectrogram (Note)',
+        'cqt_hz': 'Constant-Q power spectrogram (Hz)',
+        'chroma': 'Chromagram',
+        'tempo': 'Tempogram'
+    }
+    VALID_SPEC_TYPE = PLOT_NAMES.keys()
+
+    _FIGURE_KWARGS_KEYS = ['dpi', 'figsize']
 
     def __init__(self):
         pass
 
-
     @staticmethod
-    def load(meta_dir):
-        '''
-            The main contents of this function are a copy of the load function
-            found in utils.py from the FMA Dataset repository
-        '''
+    def _get_gram_plot_data(audio_ts, spec_type, **kwargs):
+        data = None
 
-        features, echonest, genres, tracks =  None, None, None, None
+        if spec_type in ['linear', 'log']:
+            data = librosa.amplitude_to_db(librosa.stft(audio_ts), ref=np.max)
+        elif spec_type in ['cqt_note', 'cqt_hz']:
+            data = librosa.amplitude_to_db(librosa.cqt(audio_ts, kwargs['sr']),
+                                           ref=np.max)
+        elif spec_type == 'chroma':
+            data = librosa.feature.chroma_cqt(y=audio_ts, sr=kwargs['sr'])
+        elif spec_type == 'tempo':
+            data = librosa.feature.tempogram(y=audio_ts, sr=kwargs['sr'])
+        else:
+            raise ValueError('Unrecognized type')
 
-        for root, _, files in os.walk(meta_dir):
-            for filename in files:
+        return data
 
-                filepath = os.path.join(root, filename)
+    @classmethod
+    def _plot_gram(cls, audio_ts, spec_type, grayscale, **kwargs):
+        assert spec_type in cls.VALID_SPEC_TYPE
 
-                if filename.endswith('features.csv'):
-                    features = pd.read_csv(filepath,
-                                           index_col = 0,
-                                           header = [0, 1, 2])
+        fig = plt.figure(**{key: kwargs[key] for key in kwargs
+                            if key in cls._FIGURE_KWARGS_KEYS})
+        data = cls._get_plot_data(audio_ts, spec_type, **kwargs)
+        librosa.display.specshow(data=data,
+                                 cmap=('gray_r' if grayscale else 'magma'),
+                                 x_axis='time',
+                                 y_axis=spec_type)
+        if spec_type in ['chroma', 'tempo']:
+            plt.colorbar()
+        else:
+            plt.colorbar(format='%+2.0f dB')
+        plt.title(cls.PLOT_NAMES[spec_type])
 
-                elif filename.endswith('echonest.csv'):
-                    echonest = pd.read_csv(filepath,
-                                           index_col = 0,
-                                           header = [0, 1, 2])
+    @classmethod
+    def _plot_gram_mult(cls, names, audio_ts_list, spec_type, grayscale,
+                        **kwargs):
+        assert isinstance(names, list) and isinstance(audio_ts_list)
 
-                elif filename.endswith('genres.csv'):
-                    genres = pd.read_csv(filepath,
-                                         index_col = 0)
+        fig = plt.figure(**{key: kwargs[key] for key in kwargs
+                            if key in cls._FIGURE_KWARGS_KEYS})
+        for i, (name, audio_ts) in enumerate(zip(names, audio_ts_list)):
+            plt.subplot(len(audio_ts_list), 1, i + 1)
+            data = cls._get_gram_plot_data(audio_ts, spec_type=spec_type,
+                                           **kwargs)
+            librosa.display.specshow(data=data,
+                                     cmap=('gray_r' if grayscale else 'magma'),
+                                     x_axis='time',
+                                     y_axis=spec_type)
+            plt.title(name.title())
+            if spec_type in ['chroma', 'tempo']:
+                plt.colorbar()
+            else:
+                plt.colorbar(format='%+2.0f dB')
+        plt.suptitle(cls.PLOT_NAMES[spec_type], x=0.5, y=0.915, fontsize=18)
 
-                elif filename.endswith('tracks.csv'):
-                    tracks = pd.read_csv(filepath,
-                                         index_col = 0,
-                                         header = [0, 1])
+    @classmethod
+    def show_gram_plot(cls, audio_ts, spec_type, grayscale=False, **kwargs):
+        cls._plot_gram(audio_ts, spec_type, grayscale, **kwargs)
+        plt.show()
 
-                    # Safely evaluating strings containing Python values from
-                    # untrusted sources
-                    for item in [('track', 'tags'),
-                                 ('album', 'tags'),
-                                 ('artist', 'tags'),
-                                 ('track', 'genres'),
-                                 ('track', 'genres_all')]:
-                        tracks[item] = tracks[item].map(ast.literal_eval)
+    @classmethod
+    def show_gram_plots(cls, names, audio_ts_list, spec_type, grayscale=False,
+                        **kwargs):
+        cls._plot_gram_mult(names, audio_ts_list, spec_type, grayscale,
+                            **kwargs)
+        plt.show()
 
-                    # Convert to datetime
-                    for item in [('track', 'date_created'),
-                                 ('track', 'date_recorded'),
-                                 ('album', 'date_created'),
-                                 ('album', 'date_released'),
-                                 ('artist', 'date_created'),
-                                 ('artist', 'active_year_begin'),
-                                 ('artist', 'active_year_end')]:
-                        tracks[item] = pd.to_datetime(tracks[item])
+    @classmethod
+    def save_gram_plot(cls, audio_ts, spec_type, savepath, grayscale=False,
+                       **kwargs):
+        cls._plot_gram(audio_ts, spec_type, grayscale, **kwargs)
+        plt.savefig(savepath)
 
-                    # Convert to ordered category
-                    tracks['set', 'subset'] = tracks['set', 'subset'].astype(
-                        dtype = 'category',
-                        categories = ('small', 'medium', 'large'),
-                        ordered = True
-                    )
+    @classmethod
+    def save_gram_plots(cls, names, audio_ts_list, spec_type, savepath,
+                        grayscale=False, **kwargs):
+        cls._plot_gram_mult(names, audio_ts_list, spec_type, grayscale,
+                            **kwargs)
+        plt.savefig(savepath)
 
-                    # Convert to unordered category
-                    for item in [('track', 'genre_top'),
-                                 ('track', 'license'),
-                                 ('album', 'type'),
-                                 ('album', 'information'),
-                                 ('artist', 'bio')]:
-                        tracks[item] = tracks[item].astype('category')
 
-        # Alert the user if any one of the DataFrames to be returned was
-        # not made
-        if None in [features, echonest, genres, tracks]:
-            csv_names = ['features', 'echonest', 'genres', 'tracks']
-            is_none = [name for name in csv_names if eval(name) is None]
-            print('Warning - A DataFrame was not made for' + \
-                  'the following csvs: ' + ', '.join(is_none))
-
-        return features, echonest, genres, tracks
+class AudioPlayer(object):
+    pass
