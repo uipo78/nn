@@ -273,7 +273,7 @@ class Visualizer(object):
 
         fig = plt.figure(**{key: kwargs[key] for key in kwargs
                             if key in cls._FIGURE_KWARGS_KEYS})
-        data = cls._get_plot_data(audio_ts, spec_type, **kwargs)
+        data = cls._get_gram_plot_data(audio_ts, spec_type, **kwargs)
         librosa.display.specshow(data=data,
                                  cmap=('gray_r' if grayscale else 'magma'),
                                  x_axis='time',
