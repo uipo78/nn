@@ -18,17 +18,8 @@ from sklearn.preprocessing import LabelEncoder
 
 class DataProcessor(object):
 
-    AUDIO_FILE_EXT = '.mp3'
-    FEATURE_EXTR_PARAMS = {
-        'sr': 22050,
-        'hop_length': 512,
-        'n_fft': 2048
-    }
-    TRAIN_PERCENT = 0.8
-    VALID_PERCENT = 0.1
-    TEST_PERCENT = 1 - TRAIN_PERCENT - VALID_PERCENT
-
-    def _get_splits(self):
+    @staticmethod
+    def _get_splits(audio_dir, audio_file_ext, train_percent, valid_percent):
         '''
             This function assigns a list of files to training, validation, and
             testing sets.
@@ -55,9 +46,9 @@ class DataProcessor(object):
         # and appending to files the relative path of all files in
         # self._audio_dir
         files = []
-        for root, _, dir_files in os.walk(self._audio_dir):
+        for root, _, dir_files in os.walk(audio_dir):
             for filename in dir_files:
-                if filename.endswith(self._audio_file_ext):
+                if filename.endswith(audio_file_ext):
                     filepath = os.path.join(root, filename)
                     files.append(filepath)
 
@@ -71,67 +62,56 @@ class DataProcessor(object):
         # is assigned to the validation set; what remains (which makes up
         # 1 - (self._train_percent + self._valid_percent) of files) is assigned
         # to the testing set.
-        end_train_idx = int(self._train_percent * len(files))
-        end_valid_idx = end_train_idx + int((self._valid_percent * len(files)))
+        end_train_idx = int(train_percent * len(files))
+        end_valid_idx = end_train_idx + int((valid_percent * len(files)))
 
-        self._train_files = files[:end_train_idx]
-        self._valid_files = files[end_train_idx:end_valid_idx]
-        self._test_files = files[end_valid_idx:]
+        train_files = files[:end_train_idx]
+        valid_files = files[end_train_idx:end_valid_idx]
+        test_files = files[end_valid_idx:]
 
-    def __init__(self,
-                 audio_dir,
-                 meta_dir=None,
-                 audio_file_ext=AUDIO_FILE_EXT,
-                 train_percent=TRAIN_PERCENT,
-                 valid_percent=VALID_PERCENT):
-        self._audio_dir = audio_dir
-        self._meta_dir = meta_dir
-        self._audio_file_ext = audio_file_ext
-        self._train_percent = train_percent
-        self._valid_percent = valid_percent
-        self._get_splits()
+        return train_files, valid_files, test_files
 
-    def print_audio_dir(self):
-        print(self._audio_dir)
+    def __init__(self, config):
+        self._config = config
+        self._train_files, self._valid_files, self._test_files = \
+            self._get_splits(self._config.audio_dir,
+                             self._config.audio_file_ext,
+                             self._config.train_percent,
+                             self._config.valid_percent)
 
-    def print_meta_dir(self):
-        print(self._meta_dir)
-
-    def print_audio_file_ext(self):
-        print(self._audio_file_ext)
-
-    def print_split_percents(self):
-        t, v = self._train_percent, self._valid_percent
-        print(t, v, 1 - t - v)
+    def print_config(self):
+        my_attribs = [a for a in dir(self.config) if not a.startswith('__')]
+        for attrib in my_attribs:
+            print(attrib, getattr(self.config, attrib))
 
     def load_features(self):
-        assert self._meta_dir is not None
+        assert self._config.meta_dir is not None
 
-        filepath = self._meta_dir + 'features.csv'
+        filepath = self._config.meta_dir + 'features.csv'
         features = pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
 
         return features
 
     def load_echonest(self):
-        assert self._meta_dir is not None
+        assert self._config.meta_dir is not None
 
-        filepath = self._meta_dir + 'echonest.csv'
+        filepath = self._config.meta_dir + 'echonest.csv'
         echonest = pd.read_csv(filepath, index_col = 0, header = [0, 1, 2])
 
         return echonest
 
     def load_genres(self):
-        assert self._meta_dir is not None
+        assert self._config.meta_dir is not None
 
-        filepath = self._meta_dir + 'genres.csv'
+        filepath = self._config.meta_dir + 'genres.csv'
         genres = pd.read_csv(filepath, index_col = 0)
 
         return genres
 
     def load_tracks(self):
-        assert self._meta_dir is not None
+        assert self._config.meta_dir is not None
 
-        filepath = self._meta_dir + 'tracks.csv'
+        filepath = self._config.meta_dir + 'tracks.csv'
         tracks = pd.read_csv(filepath, index_col = 0, header = [0, 1])
 
         # Safely evaluating strings containing Python values from
@@ -170,76 +150,102 @@ class DataProcessor(object):
 
         return tracks
 
-    @staticmethod
-    def _get_audio_ts(filepaths, sr):
-        audio_ts_list = []
+    # @staticmethod
+    # def _get_audio_ts(filepaths, sr):
+    #     audio_ts_list = []
+    #     for filepath in filepaths:
+    #         X, sr = librosa.load(filepath, sr)
+    #         audio_ts_list.append(X)
+    #
+    #     return audio_ts_list
+    #
+    # @staticmethod
+    # def _extract_mean_features(audio_ts, **kwargs):
+    #     stft = np.abs(
+    #         librosa.stft(audio_ts)
+    #     )
+    #     mfccs = np.mean(
+    #         librosa.feature.mfcc(y=audio_ts, sr=kwargs['sr']).T,
+    #         axis=0
+    #     )
+    #     chroma = np.mean(
+    #         librosa.feature.chroma_stft(S=stft, sr=kwargs['sr']).T,
+    #         axis=0
+    #     )
+    #     mel = np.mean(
+    #         librosa.feature.melspectrogram(audio_ts, sr=kwargs['sr']).T,
+    #         axis=0
+    #     )
+    #     contrast = np.mean(
+    #         librosa.feature.spectral_contrast(S=stft, sr=kwargs['sr']).T,
+    #         axis=0
+    #     )
+    #     tonnetz = np.mean(
+    #         librosa.feature.tonnetz(y=librosa.effects.harmonic(audio_ts),
+    #                                 sr=kwargs['sr']).T,
+    #         axis=0
+    #     )
+    #
+    #     return mfccs, chroma, mel, contrast, tonnetz
+    #
+    # @classmethod
+    # def batch_generator(cls, filepaths, get_label_function, batch_size):
+    #     filepath_batches = [iter(filepaths)] * batch_size
+    #     for filepath_batch in itertools.zip_longest(*filepath_batches):
+    #
+    #         audio_ts_batch = cls._get_audio_ts(filepath_batch,
+    #                                            sr=cls.FEAT_EXTR_PARAMS['sr'])
+    #
+    #         # 173 is the the number of columns to which the concatentation of
+    #         # features expands
+    #         features_mat, labels_vec = np.empty((batch_size, 173)), np.empty(0)
+    #
+    #         for filepath, audio_ts in zip(filepath_batch, audio_ts_batch):
+    #             ith_features = np.concatenate([
+    #                 cls._extract_features(audio_ts=audio_ts,
+    #                                       **cls.FEATURE_EXTR_PARAMS)
+    #             ])
+    #             features_mat = np.stack([features_mat, ith_features])
+    #             filename = filepath.split('/')[-1].replace(cls.AUDIO_FILE_EXT, '')
+    #             labels_vec = np.append(labels_vec, get_label_function(filename))
+    #
+    #         yield features_mat, labels_vec
+
+    def _get_datagen(self, filepaths, label_function):
+        sr = self._config.feature_extr_params['sr']
+        n_fft = self._config.feature_extr_params['n_fft']
+        n_mels = self._config.feature_extr_params['n_mels']
+        audio_file_ext = self._config.audio_file_ext
+
         for filepath in filepaths:
-            X, sr = librosa.load(filepath, sr)
-            audio_ts_list.append(X)
+            audio_ts, _ = librosa.load(filepath, sr)
 
-        return audio_ts_list
+            filename = filepath.split('/')[-1].replace(audio_file_ext, '')
+            label = label_function(filename)
 
-    @staticmethod
-    def _extract_features(audio_ts, **kwargs):
-        stft = np.abs(
-            librosa.stft(audio_ts)
-        )
-        mfccs = np.mean(
-            librosa.feature.mfcc(y=audio_ts, sr=kwargs['sr']).T,
-            axis=0
-        )
-        chroma = np.mean(
-            librosa.feature.chroma_stft(S=stft, sr=kwargs['sr']).T,
-            axis=0
-        )
-        mel = np.mean(
-            librosa.feature.melspectrogram(audio_ts, sr=kwargs['sr']).T,
-            axis=0
-        )
-        contrast = np.mean(
-            librosa.feature.spectral_contrast(S=stft, sr=kwargs['sr']).T,
-            axis=0
-        )
-        tonnetz = np.mean(
-            librosa.feature.tonnetz(y=librosa.effects.harmonic(audio_ts),
-                                    sr=kwargs['sr']).T,
-            axis=0
-        )
+            if label is not None:
+                mel_spec = librosa.feature.melspectrogram(
+                    y=audio_ts, sr=sr, n_fft=n_fft, n_mels=n_mels
+                )
 
-        return mfccs, chroma, mel, contrast, tonnetz
+                yield (mel_spec, label)
 
-    @classmethod
-    def batch_generator(cls, filepaths, get_label_function, batch_size):
-        filepath_batches = [iter(filepaths)] * batch_size
-        for filepath_batch in itertools.zip_longest(*filepath_batches):
+    def get_train_datagen(self, label_function):
+        return self._get_datagen(self._train_files, label_function)
 
-            audio_ts_batch = cls._get_audio_ts(filepath_batch,
-                                               sr=cls.FEAT_EXTR_PARAMS['sr'])
-
-            # 173 is the the number of columns to which the concatentation of
-            # features expands
-            features_mat, labels_vec = np.empty((batch_size, 173)), np.empty(0)
-
-            for filepath, audio_ts in zip(filepath_batch, audio_ts_batch):
-                ith_features = np.concatenate([
-                    cls._extract_features(audio_ts=audio_ts,
-                                          **cls.FEATURE_EXTR_PARAMS)
-                ])
-                features_mat = np.stack([features_mat, ith_features])
-                filename = filepath.split('/')[-1].replace(cls.AUDIO_FILE_EXT, '')
-                labels_vec = np.append(labels_vec, get_label_function(filename))
-
-            yield features_mat, labels_vec
+    def get_valid_datagen(self, label_function):
+        return self._get_datagen(self._valid_files, label_function)
 
 
 class Visualizer(object):
 
     PLOT_NAMES = {
+        'chroma': 'Chromagram',
+        'cqt_hz': 'Constant-Q power spectrogram (Hz)',
+        'cqt_note': 'Constant-Q power spectrogram (Note)',
         'linear': 'Linear-frequency power spectrogram',
         'log': 'Log-frequency power spectrogram',
-        'cqt_note': 'Constant-Q power spectrogram (Note)',
-        'cqt_hz': 'Constant-Q power spectrogram (Hz)',
-        'chroma': 'Chromagram',
+        'mel': 'Mel spectrogram',
         'tempo': 'Tempogram'
     }
     VALID_SPEC_TYPE = PLOT_NAMES.keys()
@@ -254,7 +260,13 @@ class Visualizer(object):
         data = None
 
         if spec_type in ['linear', 'log']:
-            data = librosa.amplitude_to_db(librosa.stft(audio_ts), ref=np.max)
+            spec_data = librosa.stft(audio_ts)
+            data = librosa.amplitude_to_db(spec_data, ref=np.max)
+        elif spec_type == 'mel':
+            spec_data = librosa.feature.melspectrogram(audio_ts,
+                                                       sr=kwargs['sr'],
+                                                       n_mels=128)
+            data = librosa.power_to_db(spec_data, ref=np.max)
         elif spec_type in ['cqt_note', 'cqt_hz']:
             data = librosa.amplitude_to_db(librosa.cqt(audio_ts, kwargs['sr']),
                                            ref=np.max)
