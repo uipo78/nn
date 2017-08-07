@@ -7,118 +7,97 @@
     This purpose of this script is to build a neural network that classifies a
     song's genre based on its audio.
 '''
+import numpy as np
 import tensorflow as tf
 import time
 
-from models import TensorflowModel
+from keras.layers import Dense, Dropout, Input
+from keras.layers.convolutional import Conv1D
+from keras.layers.merge import Concatenate
+from keras.models import Model
+from keras.layers.pooling import (
+    GlobalAveragePooling1D, GlobalMaxPooling1D, MaxPooling1D
+)
+from sklearn.preprocessing import LabelEncoder
+
 from utils import DataProcessor
 
-from sklearn.preprocessing import LabelEncoder
 
 
 class Config(object):
-    n_samples = 1024
-    n_features = 100
-    n_classes = 5
+    audio_dir = '../data/fma_large/'
+    audio_file_ext = '.mp3'
     batch_size = 64
-    n_epochs = 50
-    learning_rate = 1e-4
-
-
-class TensorGenresClassifier(TensorflowModel):
-
-    @staticmethod
-    def make_convo_relu_pool_layer():
-        pass
-
-    def add_placeholders(self):
-        input_shape = (self.config.batch_size, self.config.n_features)
-        labels_shape = (self.config.batch_size, self.config.n_classes)
-        self.input_placeholder = tf.placeholder(tf.float32, shape=input_shape)
-        self.labels_placeholder = tf.placeholder(tf.int32, shape=labels_shape)
-
-    def add_prediction_op(self):
-        b = tf.Variable(tf.zeros((self.config.batch_size, self.config.n_classes)))
-        W = tf.Variable(tf.zeros((self.config.n_features, self.config.n_classes)))
-        pred = softmax(tf.matmul(a=self.input_placeholder, b=W) + b)
-
-        return pred
-
-    def add_loss_op(self, pred):
-        pass
-
-    def add_training_op(self, loss):
-        optimizer = tf.train.AdamOptimizer(self.config.learning_rate)
-        training_op = optimizer.minimize(loss)
-
-        return train_op
-
-    def create_feed_dict(self, inputs_batch, labels_batch=None):
-        feed_dict = {self.input_placeholder: inputs_batch}
-        if labels_batch is not None:
-            feed_dict[self.labels_placeholder] = labels_batch
-
-        return feed_dict
-
-    def get_datagen(self):
-        #TODO FINISH
-        assert self.config.meta_dir is not None, 'No path specified for meta_dir'
-
-        data_processor = DataProcessor(self.config.audio_dir,
-                                       self.config.meta_dir)
-        tracks = data_processor.load_tracks()
-
-        le = LabelEncoder()
-        le.fit(tracks['genre.top'].unique())
-        datagen = data_processor.batch_generator(
-            filepaths=data_processor.train_files,
-            get_label_function=lambda track_num: le.transform(
-                tracks.loc[track_num, 'genre_top']
-            ),
-            batch_size=self.config.batch_size
-        )
-
-        return datagen
-
-    def run_epoch(self, sess, inputs, labels):
-        #TODO FINISH
-        n_minibatches, total_loss = 0, 0
-        datagen = get_datagen()
-        for input_batch, labels_batch in datagen:
-            n_minibatches += 1
-            total_loss += self.train_on_batch(sess, input_batch, labels_batch)
-
-        return total_loss / n_minibatches
-
-    def fit(self, sess, inputs, labels):
-        #TODO FINISH
-        losses = []
-        for epoch in range(self.config.n_epochs):
-            start_time = time.time()
-            average_loss = self.run_epoch(sess, inputs, labels)
-            duration = time.time() - start_time
-            print('Epoch {0}: loss = {1:.2f} ({2:.3f} sec)'.format(
-                epoch, average_loss, duration
-            ))
-            losses.append(average_loss)
-
-        return losses
-
-    def __init__(self, config):
-        '''
-            Initializes the model.
-
-            Args:
-                self.config: A model self.configuration object of type
-                             self.config.
-        '''
-
-        self.config = config
-        self.build()
-
-
-class KerasGenresClassifier(object):
+    feature_extr_params = {
+        'sr': 22050,
+        'hop_length': 512,
+        'n_fft': 2048,
+        'n_mels': 128
+    }
+    meta_dir = '../data/fma_metadata/'
+    train_percent = 0.8
+    valid_percent = 0.1
+    test_percent = 1 - train_percent - valid_percent
 
 
 if __name__ == '__main__':
     config = Config()
+
+    data_processor = DataProcessor(config)
+
+    tracks = data_processor.load_tracks()
+    tracks = tracks['track']
+
+    le = LabelEncoder()
+    le.fit([genre for genre in tracks['genre_top'].unique() if genre != np.nan])
+
+    train_datagen = data_processor.get_train_datagen(
+        lambda track_id: le.transform(tracks.ix[track_id, 'genre_top'])
+                         if tracks.ix[track_id, 'genre_top']
+                         else None
+    )
+    valid_datagen = data_processor.get_valid_datagen(
+        lambda track_id: le.transform(tracks.ix[track_id, 'genre_top'])
+                         if tracks.ix[track_id, 'genre_top']
+                         else None
+    )
+
+#===============================================================================
+    n_mels = config.feature_extr_params['n_mels']
+    n_classes = le.classes_.shape[0]
+
+    # 1291 = (song_duration * sampling_rate) / hop_length
+    inp = Input(shape=(1291, n_mels), dtype='float32', name='inp')
+
+    # conv0
+    h = Conv1D(n_mels * 2, kernel_size=4, padding='causal', activation='relu')(inp)
+    h = MaxPooling1D(pool_size=4)(h)
+    h = Dropout(0.25)(h)
+
+    # conv1
+    h = Conv1D(n_mels * 2, kernel_size=4, padding='causal', activation='relu')(h)
+    h = MaxPooling1D(pool_size=2)(h)
+    h = Dropout(0.25)(h)
+
+    # conv2
+    h = Conv1D(n_mels * 4, kernel_size=4, padding='causal', activation='relu')(h)
+    h = MaxPooling1D(pool_size=2)(h)
+    h = Dropout(0.25)(h)
+
+    # Global pooling and concatenation
+    concat = Concatenate()([GlobalAveragePooling1D()(h), GlobalMaxPooling1D()(h)])
+
+    # Fully connected
+    full = Dense(2048, activation='relu')(concat)
+
+    out = Dense(n_classes, activation='softmax')(full)
+
+    model = Model(inputs=inp, outputs=out)
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='adam',
+                  metrics=['accuracy'])
+
+    model.fit_generator(generator=train_datagen,
+                        steps_per_epoch=len(data_processor._train_files) / config.batch_size,
+                        validation_data=valid_datagen,
+                        validation_steps=len(data_processor._valid_files) / config.batch_size)
