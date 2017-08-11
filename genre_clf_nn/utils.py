@@ -150,67 +150,6 @@ class DataProcessor(object):
 
         return tracks
 
-    # @staticmethod
-    # def _get_audio_ts(filepaths, sr):
-    #     audio_ts_list = []
-    #     for filepath in filepaths:
-    #         X, sr = librosa.load(filepath, sr)
-    #         audio_ts_list.append(X)
-    #
-    #     return audio_ts_list
-    #
-    # @staticmethod
-    # def _extract_mean_features(audio_ts, **kwargs):
-    #     stft = np.abs(
-    #         librosa.stft(audio_ts)
-    #     )
-    #     mfccs = np.mean(
-    #         librosa.feature.mfcc(y=audio_ts, sr=kwargs['sr']).T,
-    #         axis=0
-    #     )
-    #     chroma = np.mean(
-    #         librosa.feature.chroma_stft(S=stft, sr=kwargs['sr']).T,
-    #         axis=0
-    #     )
-    #     mel = np.mean(
-    #         librosa.feature.melspectrogram(audio_ts, sr=kwargs['sr']).T,
-    #         axis=0
-    #     )
-    #     contrast = np.mean(
-    #         librosa.feature.spectral_contrast(S=stft, sr=kwargs['sr']).T,
-    #         axis=0
-    #     )
-    #     tonnetz = np.mean(
-    #         librosa.feature.tonnetz(y=librosa.effects.harmonic(audio_ts),
-    #                                 sr=kwargs['sr']).T,
-    #         axis=0
-    #     )
-    #
-    #     return mfccs, chroma, mel, contrast, tonnetz
-    #
-    # @classmethod
-    # def batch_generator(cls, filepaths, get_label_function, batch_size):
-    #     filepath_batches = [iter(filepaths)] * batch_size
-    #     for filepath_batch in itertools.zip_longest(*filepath_batches):
-    #
-    #         audio_ts_batch = cls._get_audio_ts(filepath_batch,
-    #                                            sr=cls.FEAT_EXTR_PARAMS['sr'])
-    #
-    #         # 173 is the the number of columns to which the concatentation of
-    #         # features expands
-    #         features_mat, labels_vec = np.empty((batch_size, 173)), np.empty(0)
-    #
-    #         for filepath, audio_ts in zip(filepath_batch, audio_ts_batch):
-    #             ith_features = np.concatenate([
-    #                 cls._extract_features(audio_ts=audio_ts,
-    #                                       **cls.FEATURE_EXTR_PARAMS)
-    #             ])
-    #             features_mat = np.stack([features_mat, ith_features])
-    #             filename = filepath.split('/')[-1].replace(cls.AUDIO_FILE_EXT, '')
-    #             labels_vec = np.append(labels_vec, get_label_function(filename))
-    #
-    #         yield features_mat, labels_vec
-
     def _get_datagen(self, filepaths, label_function):
         sr = self._config.feature_extr_params['sr']
         n_fft = self._config.feature_extr_params['n_fft']
