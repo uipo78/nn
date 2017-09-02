@@ -1,5 +1,6 @@
 import copy
 import librosa
+import os
 import time
 import torch
 import torch.autograd as autograd
@@ -112,3 +113,5 @@ if __name__ == "__main__":
 
     fitted_model = train_model(all_data, 1e-4, loss_function, model, 1, optimizer)
     fitted_model.save_state_dict("best_model.pt")
+
+    os.system("play --no-show-progress --null --channels 1 synth {} sine {}".format(1, 840))
