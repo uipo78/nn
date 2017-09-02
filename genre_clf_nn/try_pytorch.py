@@ -13,6 +13,11 @@ from data import AllData
 from models import GenreNet
 
 
+USE_CUDA = torch.cuda.is_available()
+FloatTensor = torch.cuda.FloatTensor if USE_CUDA else torch.FloatTensor
+LongTensor = torch.cuda.LongTensor if USE_CUDA else torch.LongTensor
+
+
 def exp_lr_scheduler(epoch, init_lr, optimizer, decay_factor=0.1, lr_decay_epoch=2):
     lr = init_lr * (decay_factor ** (epoch // lr_decay_epoch))
 
@@ -47,20 +52,16 @@ def train_model(all_data, init_lr, loss_function, model, n_epochs, optimizer):
             running_loss = 0.0
             running_corrects = 0
 
-            data_loader = DataLoader(dataset=data)
+            for i, (inputs, labels) in enumerate(data):
+                if i % 10 == 0:
+                    print("Data point", i)
 
-            for i, (inputs, labels) in enumerate(data_loader):
-                if i % 9 == 0:
-                    print("Data point", i + 1)
+                if inputs is None and labels is None:
+                    continue
 
-                if torch.cuda.is_available():
-                    inputs, labels = \
-                        autograd.Variable(inputs.float().cuda()), \
-                        autograd.Variable(labels.long().cuda())
-                else:
-                    inputs, labels = \
-                        autograd.Variable(inputs.float()), \
-                        autograd.Variable(labels.long())
+                inputs, labels = \
+                    autograd.Variable(FloatTensor([inputs])), \
+                    autograd.Variable(LongTensor([int(labels)]))
 
                 optimizer.zero_grad()
 
@@ -104,7 +105,7 @@ if __name__ == "__main__":
                        sr=22050,
                        train_perc=0.8)
 
-    if torch.cuda.is_available():
+    if USE_CUDA:
         model = GenreNet(n_classes=all_data.n_genres).cuda()
     else:
         model = GenreNet(n_classes=all_data.n_genres)
