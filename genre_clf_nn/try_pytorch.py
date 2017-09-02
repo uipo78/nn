@@ -72,8 +72,8 @@ def train_model(all_data, init_lr, loss_function, model, n_epochs, optimizer):
                 running_loss += loss.data[0]
                 running_corrects += torch.sum(preds == labels.data)
 
-            epoch_loss = running_loss / SOMETHING
-            epoch_accuracy = running_corrects / SOMETHIGN
+            epoch_loss = running_loss / len(data)
+            epoch_accuracy = running_corrects / len(data)
 
             print("{} Loss: {:.4f} Accuracy: {:.4f}".format(phase, epoch_loss, epoch_accuracy))
 
