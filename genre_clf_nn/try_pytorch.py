@@ -48,7 +48,9 @@ def train_model(all_data, init_lr, loss_function, model, n_epochs, optimizer):
 
             data_loader = DataLoader(dataset=data, batch_size=1)
 
-            for inputs, labels in data_loader:
+            for i, (inputs, labels) in enumerate(data_loader):
+                print("Data point", i + 1)
+
                 if torch.cuda.is_available():
                     inputs, labels = \
                         autograd.Variable(inputs.float().cuda()), \
