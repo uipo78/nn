@@ -47,10 +47,11 @@ def train_model(all_data, init_lr, loss_function, model, n_epochs, optimizer):
             running_loss = 0.0
             running_corrects = 0
 
-            data_loader = DataLoader(dataset=data, batch_size=1)
+            data_loader = DataLoader(dataset=data)
 
             for i, (inputs, labels) in enumerate(data_loader):
-                print("Data point", i + 1)
+                if i % 9 == 0:
+                    print("Data point", i + 1)
 
                 if torch.cuda.is_available():
                     inputs, labels = \
