@@ -52,18 +52,17 @@ def train_model(all_data, init_lr, loss_function, model, n_epochs, optimizer):
                 if torch.cuda.is_available():
                     inputs, labels = \
                         autograd.Variable(inputs.float().cuda()), \
-                        autograd.Variable(labels.float().cuda())
+                        autograd.Variable(labels.long().cuda())
                 else:
                     inputs, labels = \
                         autograd.Variable(inputs.float()), \
-                        autograd.Variable(labels.float())
+                        autograd.Variable(labels.long())
 
                 optimizer.zero_grad()
 
                 outputs = model(inputs)
-
                 _, preds = torch.max(outputs.data, 1)
-                loss = loss_function(outputs, labels)
+                loss = loss_function(outputs[0], autograd.Variable(torch.cuda.LongTensor([5])))
 
                 if phase == "train":
                     loss.backward()
