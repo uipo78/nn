@@ -1,34 +1,41 @@
-class TensorflowModel(object):
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-    def add_placeholders(self):
-        raise NotImplementedError("Each Model must re-implement this method.")
 
-    def create_feed_dict(self, inputs_batch, labels_batch=None):
-        raise NotImplementedError("Each Model must re-implement this method.")
+class GenreNet(nn.Module):
 
-    def add_prediction_op(self):
-        raise NotImplementedError("Each Model must re-implement this method.")
+    def __init__(self, n_classes, input_shape=(1, 128, 1291)):
+        super(GenreNet, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels = 128, out_channels = 256, kernel_size=4)
+        self.conv2 = nn.Conv1d(in_channels = 256, out_channels = 256, kernel_size=4)
+        self.conv3 = nn.Conv1d(in_channels = 256, out_channels = 512, kernel_size=4)
 
-    def add_loss_op(self, pred):
-        raise NotImplementedError("Each Model must re-implement this method.")
+        self.fc1 = nn.Linear(in_features=(512 * 3), out_features=2048)
+        self.fc2 = nn.Linear(in_features=2048, out_features=2048)
+        self.fc3 = nn.Linear(in_features=2048, out_features=n_classes)
 
-    def add_training_op(self, loss):
-        raise NotImplementedError("Each Model must re-implement this method.")
+    @staticmethod
+    def _relu_pool_drop(conv_layer, kernel_size):
+        return F.dropout(F.max_pool1d(F.relu(conv_layer), kernel_size), p=0.25)
 
-    def train_on_batch(self, sess, inputs_batch, labels_batch):
-        feed = self.create_feed_dict(inputs_batch, labels_batch=labels_batch)
-        _, loss = sess.run([self.train_op, self.loss], feed_dict=feed)
+    def forward(self, inp):
+        x = self._relu_pool_drop(self.conv1(inp), kernel_size=4)
+        x = self._relu_pool_drop(self.conv2(x), kernel_size=2)
+        x = self._relu_pool_drop(self.conv3(x), kernel_size=2)
 
-        return loss
+        # Global temporal pooling
+        operations = [
+            F.avg_pool1d(x, kernel_size=x.size(2)),
+            F.max_pool1d(x, kernel_size=x.size(2)),
+            F.lp_pool2d(x, norm_type=2, kernel_size=(1, x.size(2)))
+        ]
+        x = torch.cat(operations, 1)
 
-    def predict_on_batch(self, sess, inputs_batch):
-        feed = self.create_feed_dict(inputs_batch)
-        predictions = sess.run(self.pred, feed_dict=feed)
+        x = x.view(1, 1, -1)
 
-        return predictions
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.softmax(self.fc3(x))
 
-    def build(self):
-        self.add_placeholders()
-        self.pred = self.add_prediction_op()
-        self.loss = self.add_loss_op(self.pred)
-        self.train_op = self.add_training_op(self.loss)
+        return x
