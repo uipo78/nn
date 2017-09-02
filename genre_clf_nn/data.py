@@ -24,9 +24,13 @@ class _Split(Dataset):
         filename = ("0" * (6 - len(track_id))) + track_id + ".mp3"
         parent_name = filename[:3]
         filepath = os.path.join(self.audio_dir, parent_name, filename)
-        audio_ts, _ = librosa.load(filepath, sr=self.sr)
 
-        return self.sound_transformer(audio_ts), self.df.loc[idx, "genre_top"]
+        try:
+            audio_ts, _ = librosa.load(filepath, sr=self.sr)
+        except:
+            print("librosa.load didn't work for track", track_id, ". Skipping.")
+        else:
+            return self.sound_transformer(audio_ts), self.df.loc[idx, "genre_top"]
 
 
 class AllData(object):
