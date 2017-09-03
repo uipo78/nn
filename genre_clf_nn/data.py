@@ -29,6 +29,7 @@ class _Split(Dataset):
             audio_ts, _ = librosa.load(filepath, sr=self.sr)
         except:
             print("librosa.load didn't work for track", track_id, ". Skipping.")
+            return None, None
         else:
             return self.sound_transformer(audio_ts), self.df.loc[idx, "genre_top"]
 
