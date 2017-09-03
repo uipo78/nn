@@ -13,9 +13,8 @@ from data import AllData
 from models import GenreNet
 
 
-USE_CUDA = torch.cuda.is_available()
-FloatTensor = torch.cuda.FloatTensor if USE_CUDA else torch.FloatTensor
-LongTensor = torch.cuda.LongTensor if USE_CUDA else torch.LongTensor
+FloatTensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
 
 
 def exp_lr_scheduler(epoch, init_lr, optimizer, decay_factor=0.1, lr_decay_epoch=2):
@@ -92,7 +91,7 @@ def train_model(all_data, init_lr, loss_function, model, n_epochs, optimizer):
     return best_model
 
 
-if __name__ == "__main__":
+def main():
     all_data = AllData(audio_dir="../data/fma_large/",
                        meta_dir="../data/fma_metadata/",
                        seed=55645840,
@@ -105,7 +104,7 @@ if __name__ == "__main__":
                        sr=22050,
                        train_perc=0.8)
 
-    if USE_CUDA:
+    if torch.cuda.is_available():
         model = GenreNet(n_classes=all_data.n_genres).cuda()
     else:
         model = GenreNet(n_classes=all_data.n_genres)
@@ -117,3 +116,7 @@ if __name__ == "__main__":
     fitted_model.save_state_dict("best_model.pt")
 
     os.system("play --no-show-progress --null --channels 1 synth {} sine {}".format(1, 840))
+
+
+if __name__ == "__main__":
+    main()
