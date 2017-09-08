@@ -9,6 +9,7 @@ import torch.optim as optim
 
 from data import AllData
 from models import GenreNet
+from sys import platform
 
 
 FloatTensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
@@ -112,8 +113,10 @@ def main():
 
     fitted_model = train_model(all_data, 1e-4, loss_function, model, 1, optimizer)
     fitted_model.save_state_dict("best_model.pt")
-
-    os.system("play --no-show-progress --null --channels 1 synth {} sine {}".format(1, 840))
+    
+    if platform == "linux" or platform == "linux2":
+        os.system(
+            "play --no-show-progress --null --channels 1 synth 1 sine 840")
 
 
 if __name__ == "__main__":
