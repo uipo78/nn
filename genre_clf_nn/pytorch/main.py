@@ -7,8 +7,6 @@ import torch.autograd as autograd
 import torch.nn as nn
 import torch.optim as optim
 
-from torch.utils.data import DataLoader
-
 from data import AllData
 from models import GenreNet
 
