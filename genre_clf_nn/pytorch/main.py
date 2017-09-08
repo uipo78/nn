@@ -7,9 +7,10 @@ import torch.autograd as autograd
 import torch.nn as nn
 import torch.optim as optim
 
+from sys import platform
+
 from data import AllData
 from models import GenreNet
-from sys import platform
 
 
 FloatTensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
